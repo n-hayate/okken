@@ -233,25 +233,55 @@ except KeyError as e:
 
 # --- Firebase Configuration from Secrets ---
 try:
-    # Assumes the content of the service account JSON is stored as a dictionary
-    # under the key "firebase_service_account" in secrets
-    firebase_service_account_info = st.secrets["firebase_service_account"]
-    if not isinstance(firebase_service_account_info, dict):
-        st.error("Secret 'firebase_service_account' の形式が不正です。JSONキーの内容をTOML形式で正しく設定してください。")
+    # Secretsに定義された正しい名前("FIREBASE_SERVICE_ACCOUNT_JSON")でJSON「文字列」を取得
+    service_account_string = st.secrets["FIREBASE_SERVICE_ACCOUNT_JSON"]
+
+    # JSON文字列をPythonの辞書に変換
+    try:
+        firebase_service_account_info = json.loads(service_account_string)
+        # 念のため辞書であることを確認
+        if not isinstance(firebase_service_account_info, dict):
+            st.error("Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' の内容がJSONオブジェクト形式ではありません。")
+            st.stop()
+    except json.JSONDecodeError as json_err:
+        # JSON文字列のパースに失敗した場合のエラー
+        st.error(f"Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' のJSON形式が不正です: {json_err}")
+        st.error("サービスアカウントキーのJSON文字列全体が正しくコピー＆ペーストされているか確認してください（特に引用符や改行）。")
         st.stop()
+
 except KeyError:
-    st.error("Secret 'firebase_service_account' が見つかりません。サービスアカウントキーの内容を設定してください。")
+    # アクセスしようとしたキー名に合わせてエラーメッセージを修正
+    st.error("Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' が見つかりません。Secrets設定を確認してください。")
     st.stop()
 
 try:
-    # Assumes the content of the Firebase web config JSON is stored as a dictionary
-    # under the key "firebase_web_config" in secrets
-    firebase_config = st.secrets["firebase_web_config"]
-    if not isinstance(firebase_config, dict):
-        st.error("Secret 'firebase_web_config' の形式が不正です。Firebase Web設定の内容をTOML形式で正しく設定してください。")
+    # Secretsに定義された正しい名前("FIREBASE_CONFIG_JSON")でJSON「文字列」を取得
+    web_config_string = st.secrets["FIREBASE_CONFIG_JSON"]
+
+    # JSON文字列をPythonの辞書に変換
+    try:
+        firebase_config = json.loads(web_config_string)
+        # 念のため辞書であることを確認
+        if not isinstance(firebase_config, dict):
+             st.error("Secret 'FIREBASE_CONFIG_JSON' の内容がJSONオブジェクト形式ではありません。")
+             st.stop()
+        # # Optional: Add messagingSenderId if missing and needed (example heuristic)
+        # if "messagingSenderId" not in firebase_config:
+        #      sender_id = firebase_service_account_info.get("client_id", None)
+        #      if sender_id and sender_id.split('-')[0].isdigit():
+        #         firebase_config["messagingSenderId"] = sender_id.split('-')[0]
+        #         print("Warning: Added heuristic messagingSenderId to firebase_config")
+        #      else:
+        #         print("Warning: messagingSenderId missing from FIREBASE_CONFIG_JSON secret.")
+    except json.JSONDecodeError as json_err:
+        # JSON文字列のパースに失敗した場合のエラー
+        st.error(f"Secret 'FIREBASE_CONFIG_JSON' のJSON形式が不正です: {json_err}")
+        st.error("Firebase Web設定のJSON文字列全体が正しくコピー＆ペーストされているか確認してください。")
         st.stop()
+
 except KeyError:
-    st.error("Secret 'firebase_web_config' が見つかりません。Firebase Web設定の内容を設定してください。")
+     # アクセスしようとしたキー名に合わせてエラーメッセージを修正
+    st.error("Secret 'FIREBASE_CONFIG_JSON' が見つかりません。Secrets設定を確認してください。")
     st.stop()
 
 
