@@ -220,150 +220,77 @@ def get_base64_image(image_path):
 header_base64 = get_base64_image("assets/header_okosy.png")
 if header_base64: st.markdown( f""" <div style="text-align: center; margin-top: 30px; margin-bottom: 100px;"> <img src="data:image/png;base64,{header_base64}" width="700" style="border-radius: 8px;"> </div> """, unsafe_allow_html=True )
 
-# --- 1. 環境変数の読み込みと初期設定 ---
-# load_dotenv() # Removed
+# SecretsからAPIキー等を取得
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+GOOGLE_PLACES_API_KEY = st.secrets.get("GOOGLE_PLACES_API_KEY")
+# Firebase Admin SDK認証情報 (JSON文字列全体をSecretsに設定)
+FIREBASE_ADMIN_SDK_CREDS_JSON = st.secrets.get("FIREBASE_ADMIN_SDK_CREDS")
+# Firebase Webアプリ設定 (JSON文字列全体をSecretsに設定)
+FIREBASE_WEB_CONFIG_JSON = st.secrets.get("FIREBASE_WEB_CONFIG")
+# Vision API用認証情報 (Admin SDKと同じキーを使う場合はこれもSecretsに設定)
+# GOOGLE_APPLICATION_CREDENTIALS_JSON = st.secrets.get("GOOGLE_APPLICATION_CREDENTIALS_JSON") # 必要に応じて
 
-# --- API Keys from Secrets ---
-try:
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-    GOOGLE_PLACES_API_KEY = st.secrets["GOOGLE_PLACES_API_KEY"]
-except KeyError as e:
-    st.error(f"必要なSecretが見つかりません: {e}. Streamlit CloudのSecrets設定を確認してください。")
-    st.stop()
+# APIキー等の存在チェック
+if not OPENAI_API_KEY: st.error("OpenAI APIキーがSecretsに設定されていません"); st.stop()
+if not GOOGLE_PLACES_API_KEY: st.error("Google Places APIキーがSecretsに設定されていません"); st.stop()
+if not FIREBASE_ADMIN_SDK_CREDS_JSON: st.error("Firebase Admin SDK認証情報がSecretsに設定されていません (FIREBASE_ADMIN_SDK_CREDS)"); st.stop()
+if not FIREBASE_WEB_CONFIG_JSON: st.error("Firebase Webアプリ設定がSecretsに設定されていません (FIREBASE_WEB_CONFIG)"); st.stop()
 
-# --- Firebase Configuration from Secrets ---
-try:
-    # Secretsに定義された正しい名前("FIREBASE_SERVICE_ACCOUNT_JSON")でJSON「文字列」を取得
-    service_account_string = st.secrets["FIREBASE_SERVICE_ACCOUNT_JSON"]
+# --- 認証設定 (Vision API用) ---
+# Vision APIもFirebase Adminと同じサービスアカウントキーを使う場合、
+# initialize_appで生成したcredentialsオブジェクトを後続処理で利用するか、
+# またはSecretsに別途JSONを設定してパスを指定する代わりに内容を使う
+# ここではAdmin SDKの初期化に集中するため、Vision APIの部分は一旦コメントアウト
+# if GOOGLE_APPLICATION_CREDENTIALS_JSON:
+#    # ここで一時ファイルに書き出すか、google-authライブラリが直接JSON文字列を受け付けられるか確認が必要
+#    # print("Vision API Credentials loaded from Secrets.")
+#    pass # TODO: Vision APIの認証方法をSecretsに合わせて調整
+# else:
+#    print("Warning: Vision API Credentials JSON not found in Secrets.")
 
-    # JSON文字列をPythonの辞書に変換
-    try:
-        firebase_service_account_info = json.loads(service_account_string)
-        # 念のため辞書であることを確認
-        if not isinstance(firebase_service_account_info, dict):
-            st.error("Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' の内容がJSONオブジェクト形式ではありません。")
-            st.stop()
-    except json.JSONDecodeError as json_err:
-        # JSON文字列のパースに失敗した場合のエラー
-        st.error(f"Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' のJSON形式が不正です: {json_err}")
-        st.error("サービスアカウントキーのJSON文字列全体が正しくコピー＆ペーストされているか確認してください（特に引用符や改行）。")
-        st.stop()
+# --- OpenAI クライアント初期化 ---
+try: client = OpenAI(api_key=OPENAI_API_KEY)
+except Exception as e: st.error(f"OpenAIクライアント初期化失敗: {e}"); st.stop()
 
-except KeyError:
-    # アクセスしようとしたキー名に合わせてエラーメッセージを修正
-    st.error("Secret 'FIREBASE_SERVICE_ACCOUNT_JSON' が見つかりません。Secrets設定を確認してください。")
-    st.stop()
-
-try:
-    # Secretsに定義された正しい名前("FIREBASE_CONFIG_JSON")でJSON「文字列」を取得
-    web_config_string = st.secrets["FIREBASE_CONFIG_JSON"]
-
-    # JSON文字列をPythonの辞書に変換
-    try:
-        firebase_config = json.loads(web_config_string)
-        # 念のため辞書であることを確認
-        if not isinstance(firebase_config, dict):
-             st.error("Secret 'FIREBASE_CONFIG_JSON' の内容がJSONオブジェクト形式ではありません。")
-             st.stop()
-        # # Optional: Add messagingSenderId if missing and needed (example heuristic)
-        # if "messagingSenderId" not in firebase_config:
-        #      sender_id = firebase_service_account_info.get("client_id", None)
-        #      if sender_id and sender_id.split('-')[0].isdigit():
-        #         firebase_config["messagingSenderId"] = sender_id.split('-')[0]
-        #         print("Warning: Added heuristic messagingSenderId to firebase_config")
-        #      else:
-        #         print("Warning: messagingSenderId missing from FIREBASE_CONFIG_JSON secret.")
-    except json.JSONDecodeError as json_err:
-        # JSON文字列のパースに失敗した場合のエラー
-        st.error(f"Secret 'FIREBASE_CONFIG_JSON' のJSON形式が不正です: {json_err}")
-        st.error("Firebase Web設定のJSON文字列全体が正しくコピー＆ペーストされているか確認してください。")
-        st.stop()
-
-except KeyError:
-     # アクセスしようとしたキー名に合わせてエラーメッセージを修正
-    st.error("Secret 'FIREBASE_CONFIG_JSON' が見つかりません。Secrets設定を確認してください。")
-    st.stop()
-
-
-# --- Authentication Setup (Vision API) - No longer setting environment variable directly ---
-# Firebase Admin SDK initialization below should handle auth context for Vision API
-# print("Relying on Firebase Admin SDK for Google Cloud authentication context.")
-
-
-# --- API Key Presence Check (Redundant due to try/except above, but kept for safety) ---
-if not OPENAI_API_KEY:
-    st.error("OpenAI APIキーがSecretsに設定されていません。")
-    st.stop()
-if not GOOGLE_PLACES_API_KEY:
-    st.error("Google Places APIキーがSecretsに設定されていません。")
-    st.stop()
-
-# ============================================================
-#  2. API Client Initializations
-# ============================================================
-
-# --- OpenAI Client Initialization ---
-try:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    print("OpenAI client initialized.")
-except Exception as e:
-    st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
-    st.stop()
-
-# --- Firebase Admin SDK Initialization ---
-# Check if already initialized (useful for Streamlit's rerun behavior)
+# --- 2. Firebase Admin SDK の初期化 ---
 if not firebase_admin._apps:
     try:
-        # Use the dictionary directly from secrets
-        cred = credentials.Certificate(firebase_service_account_info)
+        # Secretsから取得したJSON文字列を辞書に変換
+        firebase_creds_dict = json.loads(FIREBASE_ADMIN_SDK_CREDS_JSON)
+        cred = credentials.Certificate(firebase_creds_dict)
         firebase_admin.initialize_app(cred)
-        print("Firebase Admin SDK initialized successfully using secrets.")
+        print("Firebase Admin SDK initialized from Secrets.")
+    except json.JSONDecodeError as e:
+        st.error(f"Firebase Admin SDK認証情報のJSON形式が無効です: {e}"); st.stop()
     except Exception as e:
-        st.error(f"Firebase Admin SDK の初期化に失敗しました: {e}")
-        st.error("Streamlit Secretsの 'firebase_service_account' の内容が正しいか確認してください。")
-        st.error(traceback.format_exc())
-        st.stop()
-else:
-    print("Firebase Admin SDK already initialized.")
+        st.error(f"Firebase Admin SDK 初期化失敗: {e}"); st.error(traceback.format_exc()); st.stop()
 
-# --- Firebase Web App Config Loading (Already loaded from secrets above) ---
-if firebase_config is None: # Should not happen due to checks above, but for safety
-     st.error("Firebase Web設定が読み込まれていません。")
-     st.stop()
-else:
-    print("Firebase web configuration loaded from secrets.")
+# --- 2.1 Firebase Web アプリ設定の読み込み ---
+firebase_config = None
+try:
+    # Secretsから取得したJSON文字列を辞書に変換
+    firebase_config = json.loads(FIREBASE_WEB_CONFIG_JSON)
+    print("Firebase Web config loaded from Secrets.")
+except json.JSONDecodeError as e:
+    st.error(f"Firebase Webアプリ設定のJSON形式が無効です: {e}"); st.stop()
+except Exception as e:
+    st.error(f"Firebase Web 設定読込失敗 (Secrets): {e}"); st.stop()
 
+# firebase_configがNoneでないかのチェックは後続のコードで実施される
 
-# --- streamlit-firebase-auth Component Initialization ---
+# --- 2.2 streamlit-firebase-auth コンポーネントの初期化 ---
 auth_obj = None
-if sfa is None:
-    st.error("認証機能の初期化に失敗しました (sfa is None)。")
-    st.stop()
-# firebase_config is guaranteed to be loaded here if code execution reached this point
-try:
-    auth_obj = sfa.FirebaseAuth(firebase_config) # Use the dictionary loaded from secrets
-    print("FirebaseAuth object created.")
-except Exception as e:
-    st.error(f"FirebaseAuth オブジェクトの作成に失敗しました: {e}")
-    st.error(traceback.format_exc())
-    st.stop()
+if sfa is None: st.error("認証機能初期化失敗 (sfa is None)"); st.stop()
+if firebase_config is None: st.error("Firebase Web設定未読込"); st.stop()
+try: auth_obj = sfa.FirebaseAuth(firebase_config)
+except Exception as e: st.error(f"FirebaseAuth オブジェクト作成失敗: {e}"); st.error(traceback.format_exc()); st.stop()
 
-# --- Firestore Client Initialization ---
-try:
-    db = firestore.client()
-    print("Firestore client initialized.")
-except Exception as e:
-    st.error(f"Firestore クライアントの初期化に失敗しました: {e}")
-    st.error(traceback.format_exc())
-    st.stop()
+# --- 2.3 Firestore クライアントの初期化 ---
+try: db = firestore.client(); print("Firestore client initialized.")
+except Exception as e: st.error(f"Firestore クライアント初期化失敗: {e}"); st.error(traceback.format_exc()); st.stop()
 
-
-# ============================================================
-#  3. Firestore Data Operation Functions (Keep as is)
-# ============================================================
-# (These functions don't depend on local files, so they remain unchanged)
+# --- Firestore データ操作関数 ---
 def save_itinerary_to_firestore(user_id: str, name: str, preferences: dict, generated_content: str, places_data: Optional[str], nickname: Optional[str] = None):
-    # ... (function content unchanged) ...
     """しおりデータをFirestoreに保存する"""
     if not db: st.error("Firestoreクライアント未初期化"); return None
     try:
@@ -381,7 +308,6 @@ def save_itinerary_to_firestore(user_id: str, name: str, preferences: dict, gene
     except Exception as e: st.error(f"Firestore保存エラー: {e}"); print(traceback.format_exc()); return None
 
 def load_itineraries_from_firestore(user_id: str):
-    # ... (function content unchanged) ...
     """指定したユーザーのしおり一覧をFirestoreから読み込む (最新20件)"""
     if not db: return []
     itineraries = []
@@ -400,7 +326,6 @@ def load_itineraries_from_firestore(user_id: str):
     except Exception as e: st.error(f"Firestore読込エラー: {e}"); print(traceback.format_exc()); return []
 
 def delete_itinerary_from_firestore(user_id: str, itinerary_id: str):
-    # ... (function content unchanged) ...
     """指定したしおりと関連する思い出をFirestoreから削除する"""
     if not db: return False
     try:
@@ -413,7 +338,6 @@ def delete_itinerary_from_firestore(user_id: str, itinerary_id: str):
     except Exception as e: st.error(f"Firestore削除エラー: {e}"); print(traceback.format_exc()); return False
 
 def save_memory_to_firestore(user_id: str, itinerary_id: str, caption: str, photo_base64: Optional[str]):
-    # ... (function content unchanged) ...
     """思い出データをFirestoreに保存する"""
     if not db: return None
     try:
@@ -423,7 +347,6 @@ def save_memory_to_firestore(user_id: str, itinerary_id: str, caption: str, phot
     except Exception as e: st.error(f"Firestore思い出保存エラー: {e}"); print(traceback.format_exc()); return None
 
 def load_memories_from_firestore(user_id: str, itinerary_id: str):
-    # ... (function content unchanged) ...
     """指定したしおりの思い出一覧をFirestoreから読み込む"""
     if not db: return []
     memories = []
@@ -435,7 +358,7 @@ def load_memories_from_firestore(user_id: str, itinerary_id: str):
             if data:
                 data['id'] = doc.id; photo_b64 = data.get('photo_base64')
                 if photo_b64:
-                    try: img_bytes = base64.b64decode(photo_b64); data['photo_image'] = Image.open(io.BytesIO(img_bytes)) # Requires PIL
+                    try: img_bytes = base64.b64decode(photo_b64); data['photo_image'] = Image.open(io.BytesIO(img_bytes))
                     except Exception as img_e: print(f"Error decode image {doc.id}: {img_e}"); data['photo_image'] = None
                 else: data['photo_image'] = None
                 memories.append(data)
@@ -443,7 +366,6 @@ def load_memories_from_firestore(user_id: str, itinerary_id: str):
     except Exception as e: st.error(f"Firestore思い出読込エラー: {e}"); print(traceback.format_exc()); return []
 
 def delete_memory_from_firestore(user_id: str, itinerary_id: str, memory_id: str):
-    # ... (function content unchanged) ...
     """指定した思い出をFirestoreから削除する"""
     if not db: return False
     try:
@@ -451,6 +373,121 @@ def delete_memory_from_firestore(user_id: str, itinerary_id: str, memory_id: str
         print(f"Memory deleted: {itinerary_id}, {memory_id}"); return True
     except Exception as e: st.error(f"Firestore思い出削除エラー: {e}"); print(traceback.format_exc()); return False
 
+def load_and_set_default_preferences(user_id: str, question_definitions: List[Dict]):
+    """Firestoreから過去しおり(最大20件)を読み込み、今回の質問デフォルト値を設定"""
+    print(f"Loading past preferences for user: {user_id}")
+    past_itineraries = load_itineraries_from_firestore(user_id)
+    if not past_itineraries: print("No past itineraries found."); return
+
+    past_prefs = {q_def["key"]: [] for q_def in question_definitions}
+    for itin in past_itineraries:
+        prefs_dict = itin.get('preferences_dict', {})
+        if isinstance(prefs_dict, dict):
+             for q_def in question_definitions:
+                 q_key = q_def["key"]
+                 pref_key_in_dict = next((k for k, v in PREF_KEY_MAP.items() if v == q_key), None)
+                 if pref_key_in_dict and pref_key_in_dict in prefs_dict:
+                     value = prefs_dict[pref_key_in_dict]
+                     if value is not None: past_prefs[q_key].append(value)
+
+    for q_def in question_definitions:
+        q_key = q_def["key"]; q_type = q_def["type"]; values = past_prefs.get(q_key, [])
+        if not values: continue
+        default_value = None
+        try:
+            if q_type in ["button_choice", "radio"]:
+                 if values: default_value = Counter(values).most_common(1)[0][0]
+            elif q_type == "number_input" or q_type == "slider":
+                 numeric_values = [v for v in values if isinstance(v, (int, float))]
+                 if numeric_values:
+                     default_value = round(statistics.mean(numeric_values))
+                     if "min" in q_def and default_value < q_def["min"]: default_value = q_def["min"]
+                     if "max" in q_def and default_value > q_def["max"]: default_value = q_def["max"]
+            elif q_type == "multiselect":
+                 all_selected_items = [item for sublist in values if isinstance(sublist, list) for item in sublist]
+                 if all_selected_items:
+                     valid_options = set(q_def.get("options", []))
+                     valid_selected_items = [item for item in all_selected_items if item in valid_options]
+                     if valid_selected_items: default_value = [item for item, count in Counter(valid_selected_items).most_common(3)]
+            elif q_type == "text_input" or q_type == "text_area":
+                 if values: default_value = values[-1]
+        except Exception as e: print(f"Error calc default for {q_key}: {e}"); default_value = None
+        if default_value is not None:
+            if q_type == "multiselect" and not isinstance(default_value, list):
+                print(f"Warn: Default for multiselect {q_key} is not a list: {default_value}. Skipping.")
+                continue
+            if q_type in ["button_choice", "radio"] and "options" in q_def and default_value not in q_def["options"]:
+                 print(f"Warn: Default for {q_key} ('{default_value}') not in options {q_def['options']}. Skipping.")
+                 continue
+            st.session_state[q_key] = default_value
+            print(f"Set default for {q_key}: {default_value}")
+
+# --- 3. 認証処理とログイン状態の管理 ---
+if 'user_info' not in st.session_state: st.session_state['user_info'] = None
+if 'id_token' not in st.session_state: st.session_state['id_token'] = None
+
+if st.session_state['user_info'] is None:
+    st.subheader("Googleアカウントでログイン")
+    st.write("Okosy を利用するには、Googleアカウントでのログインが必要です。")
+    st.info("下のフォームの「Sign in with Google」ボタンをクリックしてください。")
+    if auth_obj is None: st.error("認証オブジェクト未初期化"); st.stop()
+    try:
+        login_result = auth_obj.login_form()
+        if login_result and isinstance(login_result, dict) and login_result.get('success') is True:
+            user_data = login_result.get('user'); token_manager = user_data.get('stsTokenManager') if user_data else None
+            id_token = token_manager.get('accessToken') if token_manager else None
+            if id_token:
+                st.session_state['id_token'] = id_token
+                try:
+                    decoded_token = auth.verify_id_token(st.session_state['id_token'])
+                    st.session_state['user_info'] = decoded_token
+                    st.success("ログインしました！"); print(f"User logged in: {decoded_token.get('uid')}")
+                    time.sleep(1); st.rerun()
+                except Exception as e: st.error(f"ログインエラー (トークン検証失敗): {e}"); print(f"Token verify failed: {e}"); st.session_state['id_token'] = None; st.session_state['user_info'] = None
+            else: st.error("ログイン成功しましたが、トークンが見つかりません。"); print("AccessToken not found.")
+        elif login_result and isinstance(login_result, dict) and login_result.get('success') is False:
+            error_message = login_result.get('error', '不明なエラー')
+            if 'auth/popup-closed-by-user' in str(error_message): st.warning("ポップアップが閉じられたかブロックされました。")
+            elif 'auth/cancelled-popup-request' in str(error_message): st.warning("ログインリクエストがキャンセルされました。")
+            else: st.error(f"ログイン失敗: {error_message}")
+            print(f"Login failed: {error_message}")
+    except Exception as e: st.error(f"認証フォーム処理エラー: {e}"); st.error(traceback.format_exc())
+    st.stop()
+
+# --- 3.1 ログイン後のメインコンテンツ ---
+if st.session_state.get('user_info') is not None:
+    user_id = st.session_state['user_info'].get('uid')
+    if not user_id: st.error("ユーザーID取得不可"); st.session_state['user_info'] = None; st.session_state['id_token'] = None; st.rerun()
+
+    # --- サイドバーの設定 (ログイン後) ---
+    st.sidebar.header("メニュー")
+    user_email = st.session_state['user_info'].get('email', '不明')
+    nickname = st.session_state.get('nickname')
+    if nickname:
+        st.sidebar.write(f"ログイン中: {nickname} さん ({user_email})")
+    else:
+        st.sidebar.write(f"ログイン中: {user_email}")
+    if st.sidebar.button("ログアウト"):
+        st.session_state['user_info'] = None; st.session_state['id_token'] = None
+        keys_to_clear = [
+            "itinerary_generated", "generated_shiori_content", "final_places_data",
+            "preferences_for_prompt", "determined_destination", "determined_destination_for_prompt",
+            "messages_for_prompt", "shiori_name_input", "selected_itinerary_id",
+            "selected_itinerary_id_selector", "show_planner_select", "planner_selected", "planner",
+            "messages", "preferences", "dest", "comp", "days", "budg",
+            "pref_nature", "pref_culture", "pref_art", "pref_welness", "pref_food_local",
+            "pref_food_style", "pref_accom_type", "pref_word", "mbti", "free_request",
+            "pref_food_style_ms", "pref_word_ms", "mbti_input", "uploaded_image_files",
+            "q0_sea_mountain", "q1_style", "q2_atmosphere", "memory_caption", "memory_photo",
+            "defaults_loaded", "nickname", "current_planning_stage", "show_nickname_input"
+        ]
+        for key in keys_to_clear:
+            if key in st.session_state: del st.session_state[key]
+        st.success("ログアウトしました。"); print("User logged out.")
+        time.sleep(1); st.rerun()
+    st.sidebar.markdown("---")
+    menu_choice = st.sidebar.radio("", ["新しい旅を計画する", "過去の旅のしおりを見る"], key="main_menu", label_visibility="collapsed")
+    st.sidebar.image("assets/logo_okosy.png", width=100)
 # ============================================================
 #  4. Preference Handling Logic (Keep as is)
 # ============================================================
