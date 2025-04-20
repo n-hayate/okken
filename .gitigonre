@@ -1,0 +1,28 @@
+# Environment variables
+.env
+*.env
+
+# Firebase credentials & config (念のためワイルドカードも)
+serviceAccountKey.json
+*.json
+path/to/your/serviceAccountKey.json
+path/to/your/firebase_config.json
+
+# Python cache files and virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
