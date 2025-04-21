@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-
+import streamlit.components.v1 as components
 # ============================================================
 #  ヘルパー: 都道府県名を正規化（末尾の都/道/府/県を取り除く）
 # ============================================================
@@ -8,6 +8,23 @@ def normalize_pref_name(pref: str) -> str:
     """'東京都'→'東京', '北海道'→'北海', '大阪府'→'大阪' のように末尾を除いて比較用に返す"""
     return pref.replace("県", "").replace("府", "").replace("都", "").replace("道", "")
 
+# --- スクロール用フラグ初期化 ---
+if '_should_scroll_to_top' not in st.session_state:
+    st.session_state._should_scroll_to_top = False
+
+# --- スクロール実行コンポーネント (フラグが立っている場合のみ実行) ---
+# このブロックは、主要なUI要素が表示される前に配置するのが望ましい
+if st.session_state.get('_should_scroll_to_top', False):
+    components.html(
+        """
+        <script>
+            window.parent.document.body.scrollIntoView(true); // 親ドキュメントの先頭にスクロール
+            // もしくは window.scrollTo(0, 0); でも良い場合があります。
+        </script>
+        """,
+        height=0 # コンポーネント自体は非表示にする
+    )
+    st.session_state._should_scroll_to_top = False # フラグをリセット
 
 st.markdown("""
 <style>
@@ -1060,6 +1077,7 @@ if st.session_state.get('user_info') is not None:
                                 st.session_state.planner = opts[k]
                                 st.session_state.planner_selected = True
                                 st.session_state.current_planning_stage = 2
+                                st.session_state._should_scroll_to_top = True
                                 planner_selected_in_stage = True
                             st.markdown('</div>', unsafe_allow_html=True)
                             st.caption(opts[k]["caption"])
@@ -1174,6 +1192,7 @@ if st.session_state.get('user_info') is not None:
                             st.session_state['confirmed_destination'] = current_destination_input
                             print(f"DEBUG Stage 2 END: confirmed_destination に '{current_destination_input}' を保存")
                             st.session_state.current_planning_stage = 3
+                            st.session_state._should_scroll_to_top = True
                             st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -1239,6 +1258,7 @@ if st.session_state.get('user_info') is not None:
                         elif not st.session_state.get('q2_atmosphere'): st.warning("「どんな雰囲気を感じたい？」を選択してください。")
                         else:
                             st.session_state.current_planning_stage = 4
+                            st.session_state._should_scroll_to_top = True
                             st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -1511,6 +1531,7 @@ if st.session_state.get('user_info') is not None:
                                          st.session_state.itinerary_generated = True
                                          st.session_state.generated_shiori_content = final_res
                                          st.session_state.final_places_data = places_res_json
+                                         st.session_state._should_scroll_to_top = True 
                                          st.success("しおり完成！"); st.balloons(); st.rerun()
                                     else:
                                          st.error("しおり生成中にエラーが発生しました。")
@@ -1526,10 +1547,12 @@ if st.session_state.get('user_info') is not None:
                     st.warning("予期せぬ状態です。最初のステップに戻ります。")
                     st.session_state.current_planning_stage = 1
                     st.session_state.defaults_loaded = False
+                    st.session_state._should_scroll_to_top = True
                     st.rerun()
 
     # --- 過去の旅のしおりを見る ---
     elif menu_choice == "旅のキロク":
+        st.session_state._should_scroll_to_top = True
         st.header("過去の旅のしおり")
         if not user_id: st.error("ユーザー情報未取得"); st.stop()
         itins = load_itineraries_from_firestore(user_id)
