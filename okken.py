@@ -1267,16 +1267,16 @@ if st.session_state.get('user_info') is not None:
                         cols_slider = st.columns(4)
 
                         with cols_slider[0]:
-                            st.slider("🌲 自然", 1, 5, value=st.session_state.pref_nature, key="pref_nature")
+                            st.slider("🌲 自然", 1, 5, key="pref_nature")
 
                         with cols_slider[1]:
-                            st.slider("🏯 歴史文化", 1, 5, value=st.session_state.pref_culture, key="pref_culture")
+                            st.slider("🏯 歴史文化", 1, 5, key="pref_culture")
 
                         with cols_slider[2]:
-                            st.slider("🎨 アート", 1, 5, value=st.session_state.pref_art, key="pref_art")
+                            st.slider("🎨 アート", 1, 5, key="pref_art")
 
                         with cols_slider[3]:
-                            st.slider("♨️ ウェルネス", 1, 5, value=st.session_state.pref_welness, key="pref_welness")
+                            st.slider("♨️ ウェルネス", 1, 5, key="pref_welness")
 
                         st.markdown("---")
                         # 食事場所スタイル (st.radio)
@@ -1663,4 +1663,4 @@ if st.session_state.get('user_info') is not None:
 
 # --- フッター ---
 st.sidebar.markdown("---")
-st.sidebar.info("Okosy v1.7.3 (遷移修正適用)")
+st.sidebar.info("Okosy v1.8.1")
