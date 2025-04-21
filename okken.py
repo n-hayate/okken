@@ -835,7 +835,7 @@ if st.session_state.get('user_info') is not None:
                     else: print(f"Err: Func '{func_name}' not found."); err_content = json.dumps({"error": f"Func '{func_name}' not found."}, ensure_ascii=False); results_list.append(err_content); messages.append({ "tool_call_id": call.id, "role": "tool", "name": func_name, "content": err_content })
 
                 print("--- Sending tool results back to OpenAI (2nd) ---")
-                second_res = client.chat.completions.create(model="gpt-4o", messages=messages,max_tokens=2500 )
+                second_res = client.chat.completions.create(model="gpt-4o", messages=messages)
                 final_content = second_res.choices[0].message.content
                 finish2 = second_res.choices[0].finish_reason
                 if finish2 == "length": st.warning("⚠️ AI応答長すぎ(2nd)")
@@ -1518,6 +1518,10 @@ if st.session_state.get('user_info') is not None:
     * ツール検索でエラーが出たり、場所が見つからなかったりした場合は、無理に場所名を記載せず、その旨を行程中に記載してください（例：「おすすめのレストラン（検索エラー）」「近くのカフェなど」）。
 
 5.  **形式:** 全体を読みやすい**Markdown形式**で出力してください。各日の区切り（例: `--- 1日目 ---`）、午前/午後/夜のセクション（例: `**午前:**`）などを明確にしてください。
+**【日数と詳細さに関する最重要指示】**
+* **必ずユーザーが指定した `{days}` 日間** の旅程全体を作成してください。途中で終了せず、**必ず `{days}` 日目まで** 記述を完了させてください。3日間などで短縮してはいけません。
+* 各日（1日目から `{days}` 日目まで）について、**同程度の十分な情報量と魅力的な説明**を提供するようにしてください。後半の日程が極端に簡略化されないように注意してください。
+* ツールで検索した場所（食事、宿泊、観光）の情報は、`{days}` 日間の旅程全体に **適切に分散させて** 盛り込んでください。特定の日に偏らせず、旅行全体の流れの中で自然に配置してください。
 
 {st.session_state.planner['name']}として、{st.session_state.nickname}さんに最高の旅体験をデザインしてください。
 """
