@@ -195,6 +195,7 @@ import traceback
 from typing import Optional, List, Dict, Any
 from collections import Counter
 import statistics
+import tempfile
 
 # Firebase 関連ライブラリ
 import firebase_admin
@@ -246,6 +247,39 @@ if not FIREBASE_CONFIG_JSON:
     st.error("Streamlit Secretsに'FIREBASE_CONFIG_JSON'が見つかりません。")
     st.stop()
 
+gac_temp_file_path = None # 後で使う可能性を考慮してパスを保持 (必須ではない)
+if FIREBASE_SERVICE_ACCOUNT_JSON:
+    try:
+        # JSON文字列が有効か念のため確認
+        json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+
+        # 一時ファイルを作成 (接尾辞 .json、書き込みモード、ファイルは閉じても削除されない設定)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as temp_key_file:
+            temp_key_file.write(FIREBASE_SERVICE_ACCOUNT_JSON)
+            gac_temp_file_path = temp_key_file.name # 一時ファイルのパスを取得
+            print(f"Temporary credential file created at: {gac_temp_file_path}")
+
+        # 環境変数 GOOGLE_APPLICATION_CREDENTIALS に一時ファイルのパスを設定
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gac_temp_file_path
+        print(f"GOOGLE_APPLICATION_CREDENTIALS environment variable set to: {gac_temp_file_path}")
+
+        # 注意: Streamlit Cloud では通常セッション終了時に環境がリセットされるため、
+        # 明示的なファイル削除は不要な場合が多いですが、ローカル環境や他のデプロイ先では
+        # アプリケーション終了時に os.remove(gac_temp_file_path) を呼び出すなどの
+        # クリーンアップ処理が必要になる場合があります。
+
+    except json.JSONDecodeError as e:
+         st.error(f"Secrets のサービスアカウントJSONが無効です: {e}")
+         st.stop()
+    except Exception as e:
+        st.error(f"一時的な認証ファイルの設定中にエラーが発生しました: {e}")
+        st.error(traceback.format_exc())
+        st.stop() # 設定に失敗したらアプリを停止
+else:
+    # この前のチェックで停止するはずだが念のため
+    st.error("サービスアカウントJSONがSecretsに見つかりません。")
+    st.stop()
+
 # --- OpenAI クライアント初期化 ---
 try:
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -264,13 +298,15 @@ except json.JSONDecodeError as e:
 # Firebase Admin SDKが初期化されていない場合のみ初期化
 if not firebase_admin._apps:
     try:
-        cred = credentials.Certificate(firebase_service_account_info)
+        firebase_creds_dict = json.loads(FIREBASE_SERVICE_ACCOUNT_JSON)
+        cred = credentials.Certificate(firebase_creds_dict)
         firebase_admin.initialize_app(cred)
-        print("Firebase Admin SDK initialized.")
+        print("Firebase Admin SDK initialized from Secrets dictionary.")
+    except json.JSONDecodeError as e: # 上でチェック済みだが念のため
+        st.error(f"Firebase Admin SDK認証情報のJSON形式が無効です(再): {e}"); st.stop()
     except Exception as e:
-        st.error(f"Firebase Admin SDK 初期化失敗: {e}")
-        st.error(traceback.format_exc())
-        st.stop()
+        st.error(f"Firebase Admin SDK 初期化失敗: {e}"); st.error(traceback.format_exc()); st.stop()
+
 
 # --- 2.1 Firebase Web アプリ設定の読み込み ---
 # JSON文字列を辞書にパース
@@ -614,31 +650,88 @@ if st.session_state.get('user_info') is not None:
 
     # --- Vision API ラベル抽出関数 ---
     def get_vision_labels_from_uploaded_images(image_files):
+        """
+        アップロードされた複数の画像ファイルからVision APIを使ってラベルを抽出。
+        認証には GOOGLE_APPLICATION_CREDENTIALS 環境変数を使用する。
+        (requests を使う実装)
+        """
+        # 環境変数から認証ファイルパスを取得
         gac_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if not vision or not service_account or not Request: st.warning("Visionライブラリ未検出"); return []
-        if not gac_path: st.warning("Vision認証情報(env)未設定"); return []
-        if not os.path.exists(gac_path): st.warning(f"Vision認証ファイル未検出: {gac_path}"); return []
+
+        # Visionライブラリと認証ライブラリがインポートされているか確認
+        if not vision or not service_account or not Request:
+            st.warning("Vision または google-auth ライブラリが見つかりません。")
+            return []
+
+        # 環境変数が設定されているか、そのパスが存在するかを確認
+        if not gac_path:
+            # ★★★ このエラーメッセージが出る場合、上記の環境変数設定が失敗している ★★★
+            st.warning("Vision認証情報(env)が設定されていません。アプリの初期化処理を確認してください。")
+            return []
+        if not os.path.exists(gac_path):
+            st.warning(f"Vision認証ファイルが見つかりません: {gac_path}")
+            return []
+
+        creds = None
         try:
-            creds = service_account.Credentials.from_service_account_file(gac_path, scopes=["https://www.googleapis.com/auth/cloud-platform"])
-            if not creds.valid: creds.refresh(Request())
-            token = creds.token; endpoint = "https://vision.googleapis.com/v1/images:annotate"; all_labels = []; count = 0
+            # 環境変数で指定されたファイルパスから認証情報オブジェクトを作成
+            creds = service_account.Credentials.from_service_account_file(
+                gac_path,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            print(f"Vision credentials loaded from file: {gac_path}")
+
+            # 必要に応じてトークンをリフレッシュ (requests を使う場合は手動で行う必要がある)
+            if not creds.valid:
+                print("Refreshing Vision API credentials...")
+                creds.refresh(Request())
+
+        except Exception as e:
+            st.error(f"Vision認証情報の読み込み中にエラー (ファイル: {gac_path}): {e}")
+            print(f"Vision creds load err: {e}")
+            print(traceback.format_exc())
+            return []
+
+        # --- 画像処理ループ (requests を使う実装) ---
+        all_labels = []; count = 0
+        if creds and creds.token: # トークンがあることを確認
+            token = creds.token
+            endpoint = "https://vision.googleapis.com/v1/images:annotate"
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
             for img_file in image_files:
                 try:
                     if hasattr(img_file, 'seek'): img_file.seek(0)
                     content = base64.b64encode(img_file.read()).decode("utf-8")
                     payload = {"requests": [{"image": {"content": content}, "features": [{"type": "LABEL_DETECTION", "maxResults": 5}]}]}
-                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
                     res = requests.post(endpoint, headers=headers, json=payload, timeout=20)
+
                     if res.status_code == 200:
                         data = res.json()
-                        if data.get("responses") and data["responses"][0]: labels = [ann["description"] for ann in data["responses"][0].get("labelAnnotations", [])]; all_labels.extend(labels); count += 1
-                        else: print(f"Vision API: Invalid response {data}")
-                    else: print(f"Vision API REST err: {res.status_code}, {res.text}")
-                except requests.exceptions.Timeout: st.warning(f"Vision APIタイムアウト (1画像)"); print("Vision timeout"); continue
-                except Exception as img_e: st.warning(f"個別画像処理エラー: {img_e}"); print(f"Vision img err: {img_e}"); continue
-            unique_labels = list(set(all_labels)); print(f"Vision processed {count}/{len(image_files)}. Labels: {unique_labels[:10]}"); return unique_labels[:10]
-        except Exception as e: st.error(f"Vision API全体エラー: {e}"); print(f"Vision overall err: {e}"); print(traceback.format_exc()); return []
+                        if data.get("responses") and data["responses"][0] and "labelAnnotations" in data["responses"][0]:
+                            labels = [ann["description"] for ann in data["responses"][0]["labelAnnotations"]]
+                            all_labels.extend(labels)
+                            count += 1
+                        elif data.get("responses") and data["responses"][0] and "error" in data["responses"][0]:
+                             err_msg = f"Vision API Error (image '{getattr(img_file, 'name', 'N/A')}'): {data['responses'][0]['error'].get('message', 'Unknown')}"
+                             print(err_msg); st.warning(err_msg)
+                        else:
+                            print(f"Vision API: Invalid response format {data}"); st.warning(f"画像 '{getattr(img_file, 'name', 'N/A')}' の解析結果形式不正")
+                    else:
+                        print(f"Vision API REST err: {res.status_code}, {res.text}"); st.error(f"Vision API 通信エラー: {res.status_code}")
+                        # 継続するか停止するか？ ここでは継続
+                except requests.exceptions.Timeout:
+                    st.warning(f"Vision APIタイムアウト (画像: {getattr(img_file, 'name', 'N/A')})"); print("Vision timeout")
+                except Exception as img_e:
+                    st.warning(f"個別画像処理エラー: {img_e}"); print(f"Vision img err: {img_e}")
 
+            unique_labels = list(dict.fromkeys(all_labels)) # dict.fromkeysで順序保持
+            print(f"Vision processed {count}/{len(image_files)} via REST. Labels: {unique_labels[:10]}")
+            return unique_labels[:10]
+        else:
+            st.error("Vision API の認証トークンを取得できませんでした。")
+            return []
     # --- Google Places API 検索関数 ---
     def search_google_places(query: str, location_bias: Optional[str] = None, place_type: str = "tourist_attraction", min_rating: Optional[float] = 4.0, price_levels: Optional[str] = None) -> str:
         print(f"--- Calling Places API: Q={query}, Loc={location_bias}, Type={place_type}, Rate={min_rating}, Price={price_levels} ---")
@@ -1573,4 +1666,4 @@ if st.session_state.get('user_info') is not None:
 
 # --- フッター ---
 st.sidebar.markdown("---")
-st.sidebar.info("Okosy v1.7.3 (遷移修正適用)")
+st.sidebar.info("Okosy v1.8.1")
