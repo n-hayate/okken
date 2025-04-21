@@ -207,8 +207,12 @@ except Exception as e: st.error(f"認証ライブラリImportエラー: {e}"); s
 try:
     from google.cloud import vision
     from google.oauth2 import service_account
-    from google.auth.transport.requests import Request
-except ImportError: st.error("Visionライブラリ未検出"); vision = None; service_account = None; Request = None
+    from google.auth.transport.requests import Request # クライアントライブラリを使う場合、通常これは不要
+except ImportError:
+    st.error("google-cloud-vision または google-auth ライブラリが見つかりません。`pip install google-cloud-vision google-auth` を実行してください。")
+    # グローバル変数としてNoneを設定しておくと、後続のチェックで安全に扱える
+    vision = None
+    service_account = None
 
 # --- ヘッダー画像表示 ---
 def get_base64_image(image_path):
