@@ -835,7 +835,7 @@ if st.session_state.get('user_info') is not None:
                     else: print(f"Err: Func '{func_name}' not found."); err_content = json.dumps({"error": f"Func '{func_name}' not found."}, ensure_ascii=False); results_list.append(err_content); messages.append({ "tool_call_id": call.id, "role": "tool", "name": func_name, "content": err_content })
 
                 print("--- Sending tool results back to OpenAI (2nd) ---")
-                second_res = client.chat.completions.create(model="gpt-4o", messages=messages)
+                second_res = client.chat.completions.create(model="gpt-4o", messages=messages,max_tokens=2500 )
                 final_content = second_res.choices[0].message.content
                 finish2 = second_res.choices[0].finish_reason
                 if finish2 == "length": st.warning("⚠️ AI応答長すぎ(2nd)")
