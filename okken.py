@@ -1370,9 +1370,20 @@ if st.session_state.get('user_info') is not None:
                                             print(f"DEBUG: User input matched. dest_int set to: {dest_int}")
                                             print(f"行き先決定（ユーザー指定）: {dest_int}")
                                         else:
-                                            print("DEBUG: User input did not match any prefecture.")
-                                            st.warning(f"入力された都道府県『{user_input_raw}』は認識できませんでした。質問回答をもとに提案します。")
-                                            # dest_int remains None
+                                            print(f"DEBUG: User input '{user_input_raw}' did not match any prefecture.")
+                                             # 入力が「任意で選択」だった場合
+                                            if user_input_raw == "任意で選択":
+                                                 # 画面には特にメッセージを表示せず、コンソールにログだけ出すか、
+                                                 # st.info() などで優しいメッセージを出す（今回はコンソール出力のみ）
+                                                 print("（あなたの好みに合わせて最適な行き先を提案します）")
+                                                 # ★もし画面に表示したい場合はコメントアウトを外す↓
+                                                 # st.info("あなたの好みに合った行先を考えますね！")
+                                             # 「任意で選択」以外の、認識できない入力だった場合
+                                            else:
+                                                 # 従来通りの警告メッセージを表示
+                                                 st.warning(f"入力された都道府県『{user_input_raw}』は認識できませんでした。質問回答をもとに提案します。")
+                                             # dest_int は None のまま変更しない（後続のロジックで質問ベースの提案が行われる）
+                                             # ▲▲▲ ここまで変更 ▲▲▲
 
                                     # 2. 質問ベースで決定 (ユーザー指定で決まらなかった場合のみ)
                                     print(f"DEBUG: Before checking 'if dest_int is None'. Current dest_int = {dest_int}")
@@ -1664,4 +1675,4 @@ if st.session_state.get('user_info') is not None:
 
 # --- フッター ---
 st.sidebar.markdown("---")
-st.sidebar.info("Okosy v1.8.1")
+st.sidebar.info("Okosy v1.8.4")
