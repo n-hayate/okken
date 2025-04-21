@@ -1267,16 +1267,16 @@ if st.session_state.get('user_info') is not None:
                         cols_slider = st.columns(4)
 
                         with cols_slider[0]:
-                            st.slider("🌲 自然", 1, 5, value=st.session_state["pref_nature"], key="pref_nature")
+                            st.slider("🌲 自然", 1, 5, value=st.session_state.pref_nature, key="pref_nature")
 
                         with cols_slider[1]:
-                            st.slider("🏯 歴史文化", 1, 5, value=st.session_state["pref_culture"], key="pref_culture")
+                            st.slider("🏯 歴史文化", 1, 5, value=st.session_state.pref_culture, key="pref_culture")
 
                         with cols_slider[2]:
-                            st.slider("🎨 アート", 1, 5, value=st.session_state["pref_art"], key="pref_art")
+                            st.slider("🎨 アート", 1, 5, value=st.session_state.pref_art, key="pref_art")
 
                         with cols_slider[3]:
-                            st.slider("♨️ ウェルネス", 1, 5, value=st.session_state["pref_welness"], key="pref_welness")
+                            st.slider("♨️ ウェルネス", 1, 5, value=st.session_state.pref_welness, key="pref_welness")
 
                         st.markdown("---")
                         # 食事場所スタイル (st.radio)
@@ -1317,13 +1317,10 @@ if st.session_state.get('user_info') is not None:
                         st.markdown("---")
                         # 気になるワード
                         word_opts = ["隠れた発見", "カラフル", "静かで落ち着いた", "冒険", "定番", "温泉", "寺社仏閣", "食べ歩き","ショッピング","日本酒","ワイン", "おこもり","子供と楽しむ", "ローカル体験", "アウトドア","写真映え", "パワースポット"]
-                        word_def = st.session_state.get('pref_word')
-                        if not isinstance(word_def, list):  # ← 安全確認
-                            word_def = []
-                        valid_word_val = [v for v in word_def if v in word_opts]
                         if "pref_word" not in st.session_state or not isinstance(st.session_state.pref_word, list):
                             st.session_state.pref_word = []
-                        st.multiselect("✨ 気になるワード (複数選択可)", word_opts, default=valid_word_val, key="pref_word")
+                        valid_word_val = [v for v in st.session_state.pref_word if v in word_opts]
+                        st.multiselect("✨ 気になるワード (複数選択可)",options = word_opts, key="pref_word")
                         st.markdown("---")
                         # MBTI
                         st.text_input("🧠 あなたのMBTIは？（任意：例 ENFP）", value=st.session_state.get("mbti", ""), key="mbti", help="性格タイプに合わせて提案が変わるかも？")
@@ -1666,4 +1663,4 @@ if st.session_state.get('user_info') is not None:
 
 # --- フッター ---
 st.sidebar.markdown("---")
-st.sidebar.info("Okosy v1.8.1")
+st.sidebar.info("Okosy v1.7.3 (遷移修正適用)")
