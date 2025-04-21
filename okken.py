@@ -1378,7 +1378,7 @@ if st.session_state.get('user_info') is not None:
                                     print(f"DEBUG: Before checking 'if dest_int is None'. Current dest_int = {dest_int}")
                                     if dest_int is None:
                                         print("DEBUG: Entering 'if dest_int is None' block (This means user input was empty or invalid)")
-                                        print("ユーザー指定の行き先がないか無効のため、質問ベースで決定します。")
+                                        print("行先希望がなかったので、あなたの好みにぴったりの旅先を提案します")
                                         q_keys_dest = ["q0_sea_mountain", "q1_style", "q2_atmosphere"]
                                         map_prefs: Dict[str, Dict[str, List[str]]] = {
                                             "q0_sea_mountain": {
@@ -1464,7 +1464,8 @@ if st.session_state.get('user_info') is not None:
 1. **構成:** 冒頭に、{st.session_state.planner['name']}として、{st.session_state.nickname}さんへの呼びかけから始め、なぜこの目的地({dest_int})を選んだのか、どんな旅になりそうか、全体の総括を **{nav_pers}** 言葉で語ってください。その後、{days}日間の旅程を、各日ごとに「午前」「午後」「夜」のセクションに分けて提案してください。時間的な流れが自然になるようにプランを組んでください。
 
 2.  **内容:**
-    * なぜその場所や過ごし方が{st.session_state.nickname}さんの好みに合っているか、**{nav_pers}言葉**で理由や提案コメントを添えてください。「気になるワード」や「自由記述」の要望を意識的にプランに盛り込んでください。MBTIタイプも性格傾向を考慮するヒントにしてください。画像から読み取れた特徴も踏まえてください。
+    * 初めにこの栞のタイトルをつけてください。その時に、今回選定した県名を必ず含んでください(例：自然が好きなあなたに送る長野県の旅)
+    * 次に、なぜその場所や過ごし方が{st.session_state.nickname}さんの好みに合っているか、**{nav_pers}言葉**で理由や提案コメントを添えてください。「気になるワード」や「自由記述」の要望を意識的にプランに盛り込んでください。MBTIタイプも性格傾向を考慮するヒントにしてください。画像から読み取れた特徴も踏まえてください。
     * 隠れ家/定番のバランスはユーザーの好みに合わせてください。
     * 食事や宿泊の好みも反映してください。
     * **【説明の詳細度】** 各場所や体験について、情景が目に浮かぶような、**{nav_pers}として感情豊かに、魅力的で詳細な説明**を心がけてください。単なるリストアップではなく、そこで感じられるであろう雰囲気や感情、おすすめのポイントなどを描写してください。{st.session_state.nickname}さんの好みを反映した説明をお願いします。
