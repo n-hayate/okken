@@ -1113,18 +1113,26 @@ if st.session_state.get('user_info') is not None:
 
                     # 現在の選択を取得 or デフォルト設定
                     selected_comp_val = st.session_state.comp
+                    try:
+                        default_comp_index = comp_options.index(selected_comp_val)
+                    except ValueError:
+                        default_comp_index = 0
+                        # 同時に session_state の値も安全なデフォルト値に修正する
+                        st.session_state.comp = comp_options[default_comp_index]
+                        print(f"WARN: session_state.comp に不正な値 '{selected_comp_val}' が含まれていたため、デフォルト値に修正しました。") # デバッグ用
+
 
 
                     # プルダウン表示（現在値を初期選択）
                     comp_selection = st.selectbox(
                         "同行者を選択してください",
                         options=comp_options,
-                        index=comp_options.index(selected_comp_val),
+                        index=default_comp_index,
                         label_visibility="collapsed"
                     )
 
                     # 選択が変わったらセッションに保存して再実行
-                    if comp_selection != selected_comp_val:
+                    if comp_selection != st.session_state.comp:
                         st.session_state.comp = comp_selection
                         st.rerun()
 
@@ -1168,17 +1176,25 @@ if st.session_state.get('user_info') is not None:
 
                     # 現在の選択を取得 or デフォルト設定
                     selected_budg_val = st.session_state.budg
+                    try:
+                        default_budg_index = budg_options.index(selected_budg_val)
+                    except ValueError:
+                        default_budg_index = 0
+                        # 同時に session_state の値も安全なデフォルト値に修正する
+                        st.session_state.budg = budg_options[default_budg_index]
+                        print(f"WARN: session_state.budg に不正な値 '{selected_budg_val}' が含まれていたため、デフォルト値に修正しました。") # デバッグ用
+
 
                     # プルダウン表示（現在値を初期選択）
                     budg_selection = st.selectbox(
                         "予算を選択してください",
                         options=budg_options,
-                        index=budg_options.index(selected_budg_val),
+                        index=default_budg_index,
                         label_visibility="collapsed"
                     )
 
                     # 選択が変わったらセッションに保存して再実行
-                    if budg_selection != selected_budg_val:
+                    if budg_selection != st.session_state.budg:
                         st.session_state.budg = budg_selection
                         st.rerun()
 
@@ -1193,7 +1209,10 @@ if st.session_state.get('user_info') is not None:
                         else:
                             # ★★★★★ ここで 'desired_destination' の値を 'confirmed_destination' にコピー ★★★★★
                             current_destination_input = st.session_state.get('desired_destination', '').strip()
-                            st.session_state['confirmed_destination'] = current_destination_input
+                            if current_destination_input == "任意で選択":
+                                st.session_state['confirmed_destination'] = ""
+                            else:
+                                st.session_state['confirmed_destination'] = current_destination_input
                             print(f"DEBUG Stage 2 END: confirmed_destination に '{current_destination_input}' を保存")
                             st.session_state.current_planning_stage = 3
                             st.session_state._should_scroll_to_top = True
