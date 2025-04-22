@@ -1107,10 +1107,13 @@ if st.session_state.get('user_info') is not None:
                     comp_options = ["一人旅", "夫婦/カップル", "友人", "家族"]
                     st.write("**👥 誰と行きますか？**")
 
+                    if 'comp' not in st.session_state:
+                        st.session_state.comp = comp_options[0] # デフォルト値を設定
+
+
                     # 現在の選択を取得 or デフォルト設定
-                    selected_comp_val = st.session_state.get('comp')
-                    if selected_comp_val not in comp_options:
-                        selected_comp_val = comp_options[0]
+                    selected_comp_val = st.session_state.comp
+
 
                     # プルダウン表示（現在値を初期選択）
                     comp_selection = st.selectbox(
@@ -1160,10 +1163,11 @@ if st.session_state.get('user_info') is not None:
                     budg_options = ["気にしない", "コスパ重視", "普通", "ちょっと贅沢"]
                     st.write("**💰 予算感は？**")
 
+                    if 'budg' not in st.session_state:
+                        st.session_state.budg = budg_options[0] 
+
                     # 現在の選択を取得 or デフォルト設定
-                    selected_budg_val = st.session_state.get('budg')
-                    if selected_budg_val not in budg_options:
-                        selected_budg_val = budg_options[0]
+                    selected_budg_val = st.session_state.budg
 
                     # プルダウン表示（現在値を初期選択）
                     budg_selection = st.selectbox(
@@ -1515,7 +1519,7 @@ if st.session_state.get('user_info') is not None:
     * **【最重要】** このMarkdownリンク (`[場所名](URL)`) **以外に、場所名をテキストとして記載しないでください。** リンクテキストがそのまま場所名として表示されるようにしてください。
     * デバッグ表示用のExpander（お店候補の表示）に出力する場所情報についても、上記と同じ形式のMarkdownリンクで場所名を表示するようにしてください。
     * **各日の夜のパートには、ステップ③のツール検索結果から**、**必ず**最適な宿泊施設を1つ選び、その名前と上記形式のGoogle Mapsリンクを記載してください。検索結果がない場合や検索しなかった場合でも、一般的な宿泊エリアやタイプの提案をしてください。
-    * 初日は必ず午前から始め、ホテル情報は夕食後か夜のパートで提案してください。
+    * 初日は必ず午前から始め、ホテル情報は夕食後か夜のパートで提案してください。最終日は夜の情報を出力せず、午後で帰路につくようなプランにしてください。
     * ツール検索でエラーが出たり、場所が見つからなかったりした場合は、無理に場所名を記載せず、その旨を行程中に記載してください（例：「おすすめのレストラン（検索エラー）」「近くのカフェなど」）。
 
 5.  **形式:** 全体を読みやすい**Markdown形式**で出力してください。各日の区切り（例: `--- 1日目 ---`）、午前/午後/夜のセクション（例: `**午前:**`）などを明確にしてください。
